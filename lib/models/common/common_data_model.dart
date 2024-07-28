@@ -1,6 +1,6 @@
 class CommonDM {
-  final bool? success;
-  final String? message;
+  final bool success;
+  final String message;
   final int? code;
 
   final dynamic _data;

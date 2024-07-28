@@ -8,3 +8,4 @@ const Color cPlaceHolderColor = Color(0xFF868686);
 const Color cIconColor = Color(0xFF767982);
 const Color cGreyBoxColor = Color(0xFFF6F6F6);
 const Color cTransparentColor = Colors.transparent;
+const Color cNeutralColor = Color(0XFFECECEC);

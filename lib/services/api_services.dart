@@ -109,14 +109,13 @@ class ApiServices {
         timer: timer,
         client: client,
       );
-      ll("response statusCode : ${response.statusCode}");
+      // ll("response statusCode : ${response.statusCode}");
       if (response.statusCode == 200) {
         final object = json.decode(response.body.toString());
         final prettyString = const JsonEncoder.withIndent('  ').convert(object);
-        ll("Response : $prettyString");
-        // CommonDM cm = convertToCommonObject(jsonDecode(response.body));
-        // return cm;
-        return jsonDecode(response.body);
+        // ll("Response : $prettyString");
+        CommonDM cm = convertToCommonObject(jsonDecode(response.body));
+        return cm;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         await SpController().onLogout();
         Get.offAllNamed(krHome);

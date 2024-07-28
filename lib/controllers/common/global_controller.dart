@@ -1,4 +1,4 @@
-import 'package:startup_boilerplate/models/dummy.dart';
+import 'package:startup_boilerplate/controllers/messenger/messenger_controller.dart';
 import 'package:startup_boilerplate/services/api_services.dart';
 import 'package:startup_boilerplate/utils/constants/imports.dart';
 
@@ -10,41 +10,30 @@ class GlobalController extends GetxController {
 
   @override
   void onInit() {
-    getPostList();
-
     super.onInit();
   }
 
-  final RxBool isPageLoading = RxBool(false);
-  final Rx<TestListModel?> modelData = Rx<TestListModel?>(null);
-  final RxList<ListData> listData = RxList<ListData>([]);
-  Future<void> getPostList() async {
-    try {
-      isPageLoading.value = true;
-      String? token = await spController.getBearerToken();
-      var response = await apiServices.commonApiCall(
-        requestMethod: get,
-        token: token,
-        url: "users?page=1",
-      );
-      if (response != null) {
-        listData.clear();
-        modelData.value = TestListModel.fromJson(response);
-        listData.addAll(modelData.value!.data!);
-        isPageLoading.value = false;
-      } else {
-        isPageLoading.value = true;
+  final Rx<String?> userName = Rx<String?>(null);
+  final Rx<String?> userFirstName = Rx<String?>(null);
+  final Rx<String?> userLastName = Rx<String?>(null);
+  final Rx<String?> userImage = Rx<String?>(null);
+  final Rx<String?> userEmail = Rx<String?>(null);
+  final Rx<int?> userId = Rx<int?>(null);
+  final Rx<String?> userToken = Rx<String?>(null);
 
-        // ErrorModel errorModel = ErrorModel.fromJson(response.data);
-        // if (errorModel.errors.isEmpty) {
-        //   showSnackBar(title: ksError.tr, message: response.message, color: cRedColor);
-        // } else {
-        //   showSnackBar(title: ksError.tr, message: errorModel.errors[0].message, color: cRedColor);
-        // }
-      }
-    } catch (e) {
-      isPageLoading.value = true;
-      ll('getList error: $e');
+  Future<void> getUserInfo() async {
+    SpController spController = SpController();
+
+    userId.value = await spController.getUserId();
+    userToken.value = await spController.getBearerToken();
+  }
+
+  RxList<Map<String, dynamic>> allOnlineUsers = RxList<Map<String, dynamic>>([]);
+  void populatePeerList(newUserData) {
+    allOnlineUsers.add({"userID": newUserData});
+
+    if (Get.find<MessengerController>().allRoomMessageList.isNotEmpty) {
+      Get.find<MessengerController>().updateRoomListWithOnlineUsers();
     }
   }
 }

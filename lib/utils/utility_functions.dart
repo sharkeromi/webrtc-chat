@@ -1,7 +1,8 @@
 import 'dart:developer';
-
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:startup_boilerplate/utils/constants/consts.dart';
 import 'package:startup_boilerplate/utils/constants/imports.dart';
+import 'package:startup_boilerplate/utils/constants/urls.dart';
 
 void heightWidthKeyboardValue(context) {
   height = MediaQuery.of(context).size.height;
@@ -51,5 +52,10 @@ void unfocus(context) {
       duration: Duration(milliseconds: duration ?? 1500),
     );
   }
+
+  IO.Socket socket = IO.io(webSocketURL, <String, dynamic>{
+      'transports': ['websocket'],
+      'autoConnect': false,
+    });
 
 

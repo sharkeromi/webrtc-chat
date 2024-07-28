@@ -47,10 +47,12 @@ const double h8 = 8.0;
 //* Icon sizes
 const double kIconSize8 = 8.0;
 const double kIconSize12 = 12.0;
+const double kIconSize14 = 14.0;
 const double kIconSize16 = 16.0;
 const double kIconSize20 = 20.0;
 const double kIconSize24 = 24.0;
 const double kIconSize28 = 28.0;
+const double kIconSize35 = 35.0;
 
 //* padding for different component
 const double kHorizontalPadding = 20.0;
