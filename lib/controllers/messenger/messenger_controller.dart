@@ -457,26 +457,36 @@ class MessengerController extends GetxController {
   final RxBool isLocalFeedStreaming = RxBool(false);
   final RxBool isRemoteFeedStreaming = RxBool(false);
   final RxBool isUserTypeSender = RxBool(false);
+  final RxBool isAudioCallState = RxBool(false);
 
-  void initializeLocalStream(RTCPeerConnection peerConnection) async {
-    ll("STREAM PEER CONNECTION: ${peerConnection.signalingState}");
-    await MessengerHelper().openUserMedia();
-  }
-
-  void initiateVideoCall(RTCPeerConnection? peerConnection, userID) async {
-    await MessengerHelper().openUserMedia();
+  void initiateVideoCall(RTCPeerConnection? peerConnection, userID, isAudioCall) async {
+    await MessengerHelper().openUserMedia(isAudioCall);
 
     localStream?.getTracks().forEach((track) {
       ll("ON VIDEO CALL START GETTING LOCAL TRACK: $track");
       peerConnection?.addTrack(track, localStream!);
     });
+    RTCSessionDescription? offer;
 
-    RTCSessionDescription offer = await peerConnection!.createOffer();
+    if(isAudioCall){
+       offer = await peerConnection!.createOffer({
+      'offerToReceiveAudio': true,
+      'offerToReceiveVideo': false,
+    });
+    }else{
+     offer = await peerConnection!.createOffer();
+    }
+    if(isAudioCall){
+    Helper.setSpeakerphoneOn(false);
+    }else{
+      Helper.setSpeakerphoneOn(true);
+    }
 
     await peerConnection.setLocalDescription(offer);
     socket.emit('mobile-video-call-$userID', {
       'userID': Get.find<GlobalController>().userId.value,
       'callStatus': "inCall",
+      'callType': isAudioCall?"audio":"video",
       'type': "offer",
       'data': {
         'sdp': offer.sdp,
@@ -487,7 +497,7 @@ class MessengerController extends GetxController {
     // todo: may need to store the peer connection
   }
 
-  void ringUser(userID) {
+  void ringUser(userID, isAudioCall) {
     isUserTypeSender.value = true;
     Map<int, Map<String, dynamic>> allRoomMessageListMap = {for (var user in Get.find<MessengerController>().allRoomMessageList) user['userID']: user};
     if (allRoomMessageListMap.containsKey(userID)) {
@@ -497,9 +507,15 @@ class MessengerController extends GetxController {
     socket.emit('mobile-video-call-$userID', {
       'userID': Get.find<GlobalController>().userId.value,
       'callStatus': "ringing",
+      'callType': isAudioCall?"audio":"video",
       'type': "offer",
     });
     callState.value = "ringing";
+    if(isAudioCall){
+      isAudioCallState.value = true;
+    }else{
+      isAudioCallState.value = false;
+    }
     Get.toNamed(krCallScreen);
   }
 }

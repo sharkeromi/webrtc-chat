@@ -63,7 +63,7 @@ class SocketController extends GetxController {
             allRoomMessageListMap[data['userID']]!['peerConnection'] = peerConnection;
           }
         }
-        
+
         Get.find<MessengerController>().allRoomMessageList.clear();
         Get.find<MessengerController>().allRoomMessageList.addAll(allRoomMessageListMap.values.toList());
         registerPeerConnectionListeners(peerConnection, data);
@@ -108,7 +108,6 @@ class SocketController extends GetxController {
         ll('Setting remote description');
         RTCSessionDescription description = RTCSessionDescription(data['data']['sdp'], data['data']['type']);
         await peerConnection?.setRemoteDescription(description);
-
       } else if (data['type'] == "candidate") {
         RTCPeerConnection? globalPeerConnection;
         ll('Got new remote ICE candidate: ${jsonEncode(data)}');
@@ -158,14 +157,19 @@ class SocketController extends GetxController {
           Get.find<MessengerController>().callerImage.value = allRoomMessageListMap[data['userID']]!['userImage'];
         }
         Get.find<MessengerController>().callerID.value = data['userID'];
+        if (data['callType'] == "audio") {
+          Get.find<MessengerController>().isAudioCallState.value = true;
+        } else {
+          Get.find<MessengerController>().isAudioCallState.value = false;
+        }
         Get.toNamed(krRingingScreen);
       } else if (data['callStatus'] == "accepted") {
-         RTCPeerConnection? peerConnection;
+        RTCPeerConnection? peerConnection;
         Map<int, Map<String, dynamic>> allRoomMessageListMap = {for (var user in Get.find<MessengerController>().allRoomMessageList) user['userID']: user};
         if (allRoomMessageListMap.containsKey(data['userID'])) {
           peerConnection = allRoomMessageListMap[data['userID']]!['peerConnection'];
         }
-        Get.find<MessengerController>().initiateVideoCall(peerConnection, data['userID']);
+        Get.find<MessengerController>().initiateVideoCall(peerConnection, data['userID'], Get.find<MessengerController>().isAudioCallState.value);
       } else if (data['callStatus'] == "declined") {
         Get.back();
         showSnackBar(
@@ -187,12 +191,17 @@ class SocketController extends GetxController {
           Get.find<MessengerController>().allRoomMessageList.addAll(allRoomMessageListMap.values.toList());
           if (peerConnection!.signalingState == RTCSignalingState.RTCSignalingStateHaveRemoteOffer) {
             try {
-              await MessengerHelper().openUserMedia();
+              await MessengerHelper().openUserMedia(Get.find<MessengerController>().isAudioCallState.value);
 
               Get.find<MessengerController>().localStream?.getTracks().forEach((track) {
                 ll("ON ANSWER VIDEO CALL GETTING LOCAL TRACK: $track");
                 peerConnection!.addTrack(track, Get.find<MessengerController>().localStream!);
               });
+              if (Get.find<MessengerController>().isAudioCallState.value) {
+                Helper.setSpeakerphoneOn(false);
+              } else {
+                Helper.setSpeakerphoneOn(true);
+              }
               var answer = await peerConnection.createAnswer();
               ll('Created Answer for video call $answer');
               await peerConnection.setLocalDescription(answer);
@@ -314,12 +323,11 @@ class SocketController extends GetxController {
       }
       Get.find<MessengerController>().remoteRenderer.srcObject = stream;
       Get.find<MessengerController>().remoteStream = stream;
-       Get.find<MessengerController>().isRemoteFeedStreaming.value = true;
+      Get.find<MessengerController>().isRemoteFeedStreaming.value = true;
     };
 
     peerConnection?.onAddStream = (MediaStream stream) {
       ll("Getting remote stream");
-
     };
   }
 

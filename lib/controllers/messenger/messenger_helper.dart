@@ -4,12 +4,16 @@ import 'package:startup_boilerplate/controllers/messenger/messenger_controller.d
 
 class MessengerHelper {
   final MessengerController messengerController = Get.find<MessengerController>();
-  Future<void> openUserMedia() async {
-    var stream = await webRTC.navigator.mediaDevices.getUserMedia({'video': true, 'audio': true});
+  Future<void> openUserMedia(isAudioCall) async {
+    var stream = await webRTC.navigator.mediaDevices.getUserMedia({'video': isAudioCall ? false : true, 'audio': true});
 
-    messengerController.localRenderer.srcObject = stream;
     messengerController.localStream = stream;
-    messengerController.isLocalFeedStreaming.value = true;
+    if (!isAudioCall) {
+      messengerController.localRenderer.srcObject = stream;
+      messengerController.isLocalFeedStreaming.value = true;
+    } else {
+      messengerController.isLocalFeedStreaming.value = false;
+    }
   }
 
   Future<void> hangUp() async {
@@ -27,35 +31,36 @@ class MessengerHelper {
   }
 
   Future<void> switchCamera(userID) async {
-    webRTC.RTCPeerConnection? peerConnection;
-    Map<int, Map<String, dynamic>> allRoomMessageListMap = {for (var user in Get.find<MessengerController>().allRoomMessageList) user['userID']: user};
-    if (allRoomMessageListMap.containsKey(userID)) {
-      peerConnection = allRoomMessageListMap[userID]!['peerConnection'];
-    }
+    // webRTC.RTCPeerConnection? peerConnection;
+    // Map<int, Map<String, dynamic>> allRoomMessageListMap = {for (var user in Get.find<MessengerController>().allRoomMessageList) user['userID']: user};
+    // if (allRoomMessageListMap.containsKey(userID)) {
+    //   peerConnection = allRoomMessageListMap[userID]!['peerConnection'];
+    // }
     var videoTrack = messengerController.localStream?.getVideoTracks().first;
 
-    if (videoTrack != null) {
-      var currentFacingMode = videoTrack.getSettings()['facingMode'];
-      String newFacingMode = currentFacingMode == 'user' ? 'environment' : 'user';
+    webRTC.Helper.switchCamera(videoTrack!);
+    // if (videoTrack != null) {
+    //   var currentFacingMode = videoTrack.getSettings()['facingMode'];
+    //   String newFacingMode = currentFacingMode == 'user' ? 'environment' : 'user';
 
-      await videoTrack.stop();
-      // Get a new video stream with the desired facing mode
-      var newStream = await webRTC.navigator.mediaDevices.getUserMedia({
-        'video': {'facingMode': newFacingMode},
-        'audio': true,
-      });
+    //   await videoTrack.stop();
+    //   // Get a new video stream with the desired facing mode
+      // var newStream = await webRTC.navigator.mediaDevices.getUserMedia({
+      //   'video': {'facingMode': newFacingMode},
+      //   'audio': true,
+      // });
 
-      var newVideoTrack = newStream.getVideoTracks().first;
+    //   var newVideoTrack = newStream.getVideoTracks().first;
 
-      messengerController.localStream?.addTrack(newVideoTrack);
-      peerConnection!.addTrack(newVideoTrack, newStream);
+    //   messengerController.localStream?.addTrack(newVideoTrack);
+    //   peerConnection!.addTrack(newVideoTrack, newStream);
 
-      messengerController.localRenderer.srcObject = newStream;
+    //   messengerController.localRenderer.srcObject = newStream;
 
-      messengerController.localStream = newStream;
+    //   messengerController.localStream = newStream;
 
-      messengerController.isLocalFeedStreaming.value = true;
-    }
+    //   messengerController.isLocalFeedStreaming.value = true;
+    // }
   }
 
   Future<void> toggleMuteAudio() async {

@@ -10,6 +10,10 @@ class CallScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    ll(messengerController.callState.value);
+    ll(messengerController.isAudioCallState.value);
+    ll(messengerController.isRemoteFeedStreaming.value);
+
     return Container(
       color: cWhiteColor,
       child: SafeArea(
@@ -21,7 +25,7 @@ class CallScreen extends StatelessWidget {
               backgroundColor: cWhiteColor,
               body: Stack(
                 children: [
-                  if (messengerController.callState.value == "inCall")
+                  if (messengerController.callState.value == "inCall" && !messengerController.isAudioCallState.value)
                     Expanded(
                       child: messengerController.isRemoteFeedStreaming.value
                           ? (messengerController.callState.value == "ringing"
@@ -29,7 +33,8 @@ class CallScreen extends StatelessWidget {
                               : RTCVideoView(messengerController.remoteRenderer))
                           : const SizedBox(),
                     ),
-                  if (messengerController.callState.value == "ringing")
+                  if (messengerController.callState.value == "ringing" ||
+                      (messengerController.callState.value == "inCall" && messengerController.isAudioCallState.value))
                     Positioned(
                         top: 100,
                         child: SizedBox(
@@ -78,22 +83,23 @@ class CallScreen extends StatelessWidget {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              InkWell(
-                                onTap: () {
-                                  MessengerHelper().switchCamera(messengerController.callerID.value);
-                                },
-                                child: Container(
-                                  decoration: const BoxDecoration(color: cBlackColor, shape: BoxShape.circle),
-                                  height: 70,
-                                  width: 70,
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.cameraswitch_rounded,
-                                      color: cWhiteColor,
+                              if (!messengerController.isAudioCallState.value)
+                                InkWell(
+                                  onTap: () {
+                                    MessengerHelper().switchCamera(messengerController.callerID.value);
+                                  },
+                                  child: Container(
+                                    decoration: const BoxDecoration(color: cBlackColor, shape: BoxShape.circle),
+                                    height: 70,
+                                    width: 70,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.cameraswitch_rounded,
+                                        color: cWhiteColor,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
                               InkWell(
                                 onTap: () {
                                   MessengerHelper().hangUp();
@@ -131,7 +137,7 @@ class CallScreen extends StatelessWidget {
                           ),
                         ),
                       )),
-                  if (messengerController.callState.value == "inCall")
+                  if (messengerController.callState.value == "inCall" && !messengerController.isAudioCallState.value)
                     Positioned(
                       top: 50,
                       right: 20,
