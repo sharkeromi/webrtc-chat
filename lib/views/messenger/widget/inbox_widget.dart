@@ -46,6 +46,7 @@ class InboxContainer extends StatelessWidget {
           messengerController.connectUser(userID);
         } else {
           messengerController.targetDataChannel = dataChannel;
+          messengerController.targetPeerConnection = peerConnection;
         }
         Get.toNamed(krMessages);
         //* GET MESSAGE API CALL

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:startup_boilerplate/controllers/common/global_controller.dart';
 import 'package:startup_boilerplate/controllers/common/sp_controller.dart';
+import 'package:startup_boilerplate/controllers/messenger/messenger_helper.dart';
 import 'package:startup_boilerplate/models/common/common_data_model.dart';
 import 'package:startup_boilerplate/models/common/common_error_model.dart';
 import 'package:startup_boilerplate/models/messenger/message_list_model.dart';
@@ -31,6 +32,8 @@ class MessengerController extends GetxController {
         isMessageTextFieldFocused.value = false;
       }
     });
+    localRenderer.initialize();
+    remoteRenderer.initialize();
     super.onInit();
   }
 
@@ -82,9 +85,8 @@ class MessengerController extends GetxController {
   }
 
   //* Variables
-  // RTCPeerConnection? peerConnection;
-  // RTCDataChannel? dataChannel;
   RTCDataChannel? targetDataChannel;
+  RTCPeerConnection? targetPeerConnection;
   final RxList connectedUserID = RxList([]);
   final Map<String, dynamic> configuration = {
     'iceServers': [
@@ -212,16 +214,13 @@ class MessengerController extends GetxController {
   int batchSize = 1;
 
   void sendMessage(String message, RTCDataChannel dataChannel) async {
-    // if (connected.value && isInternetConnectionAvailable.value) {]
     ll(dataChannel.label);
     if (isInternetConnectionAvailable.value) {
-      // Add to offline list
+
       setMessage(selectedReceiver.value!.id, MessageData(text: message, senderId: globalController.userId.value, messageText: message));
 
-      // Send through webRTC
       sendViaDataChannel(message, dataChannel);
 
-      // Add message to queue
       messageQueue.add(message);
 
       if (messageQueue.length >= batchSize && isInternetConnectionAvailable.value) {
@@ -234,14 +233,16 @@ class MessengerController extends GetxController {
     }
   }
 
-  void setUpRoomDataChannel(userID, dataChannel) {
+  void setUpRoomDataChannel(userID, dataChannel, peerConnection) async {
     targetDataChannel = dataChannel;
+    targetPeerConnection = peerConnection;
     ll("Set up room data channel: $targetDataChannel $dataChannel");
     Map<int, Map<String, dynamic>> roomMap = {for (var onlineUser in allRoomMessageList) onlineUser['userID']: onlineUser};
 
     if (roomMap.containsKey(userID)) {
       roomMap[userID]!['dataChannelLabel'] = dataChannel.label;
       roomMap[userID]!['dataChannel'] = dataChannel;
+      roomMap[userID]!['peerConnection'] = peerConnection;
     }
     allRoomMessageList.clear();
     allRoomMessageList.addAll(roomMap.values.toList());
@@ -258,7 +259,7 @@ class MessengerController extends GetxController {
         "peerConnection": null,
         "status": false.obs,
         "userName": roomList[i].roomName,
-        "userImage": roomList[i].roomImage,
+        "userImage": roomList[i].roomImage![0],
         "isSeen": true.obs,
         "messages": RxList([]),
       });
@@ -315,8 +316,6 @@ class MessengerController extends GetxController {
 
     registerPeerConnectionListeners(peerConnection);
     RTCDataChannelInit dataChannelDict = RTCDataChannelInit();
-    // dataChannelDict.id = 1;
-    // dataChannelDict.ordered = true;
     String dataChannelName = "${Get.find<GlobalController>().userId.value}-$userID";
     RTCDataChannel dataChannel = await peerConnection.createDataChannel(dataChannelName, dataChannelDict);
 
@@ -346,7 +345,6 @@ class MessengerController extends GetxController {
                 senderImage: Get.find<MessengerController>().selectedReceiver.value!.roomImage![0]));
       }
     };
-
     peerConnection.onIceCandidate = (RTCIceCandidate candidate) {
       socket.emit('mobile-chat-peer-exchange-$userID', {
         'userID': Get.find<GlobalController>().userId.value,
@@ -370,8 +368,9 @@ class MessengerController extends GetxController {
         'type': offer.type,
       },
     });
+
     ll("CORE DATACHANNEL: ${dataChannel.state}");
-    setUpRoomDataChannel(userID, dataChannel);
+    setUpRoomDataChannel(userID, dataChannel, peerConnection);
   }
 
   void sendViaDataChannel(String message, dataChannel) {
@@ -399,11 +398,42 @@ class MessengerController extends GetxController {
       ll('ICE connection state change: $state');
     };
 
-    // peerConnection?.onAddStream = (MediaStream stream) {
-    //   print("Add remote stream");
-    //   onAddRemoteStream?.call(stream);
-    //   remoteStream = stream;
-    // };
+    peerConnection?.onTrack = (RTCTrackEvent event) async {
+      ll('Got remote track mc: ${event.streams[0]}');
+
+      if (Get.find<MessengerController>().remoteStream == null) {
+        ll('Initializing remoteStream');
+        remoteStream = await createLocalMediaStream('remoteStream');
+      } else {
+        ll('remoteStream already initialized');
+      }
+
+      event.streams[0].getTracks().forEach((track) {
+        ll('Add a track to the remoteStream $track');
+        remoteStream?.addTrack(track);
+        remoteRenderer.srcObject = remoteStream;
+        isRemoteFeedStreaming.value = true;
+      });
+    };
+
+    peerConnection?.onAddTrack = (MediaStream stream, MediaStreamTrack track) async {
+      ll("GETTING REMOTE TRACK MC");
+      if (remoteStream == null) {
+        ll('Initializing remoteStream');
+        remoteStream = await createLocalMediaStream('remoteStream');
+      } else {
+        ll('remoteStream already initialized');
+      }
+      remoteRenderer.srcObject = stream;
+      remoteStream = stream;
+      isRemoteFeedStreaming.value = true;
+    };
+
+    peerConnection?.onAddStream = (MediaStream stream) {
+      ll("Add remote stream");
+
+    };
+
   }
 
   // Set Messages
@@ -412,5 +442,64 @@ class MessengerController extends GetxController {
     if (index != -1) {
       allRoomMessageList[index]["messages"].insert(0, messageData);
     }
+  }
+
+  // * AUDIO VIDEO CALL
+  RTCVideoRenderer localRenderer = RTCVideoRenderer();
+  RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
+  MediaStream? localStream;
+  MediaStream? remoteStream;
+  final RxInt? selectedUserID = RxInt(-1);
+  final RxString callState = RxString("online");
+  final RxString callerName = RxString("");
+  final RxString callerImage = RxString("");
+  final RxInt callerID = RxInt(-1);
+  final RxBool isLocalFeedStreaming = RxBool(false);
+  final RxBool isRemoteFeedStreaming = RxBool(false);
+  final RxBool isUserTypeSender = RxBool(false);
+
+  void initializeLocalStream(RTCPeerConnection peerConnection) async {
+    ll("STREAM PEER CONNECTION: ${peerConnection.signalingState}");
+    await MessengerHelper().openUserMedia();
+  }
+
+  void initiateVideoCall(RTCPeerConnection? peerConnection, userID) async {
+    await MessengerHelper().openUserMedia();
+
+    localStream?.getTracks().forEach((track) {
+      ll("ON VIDEO CALL START GETTING LOCAL TRACK: $track");
+      peerConnection?.addTrack(track, localStream!);
+    });
+
+    RTCSessionDescription offer = await peerConnection!.createOffer();
+
+    await peerConnection.setLocalDescription(offer);
+    socket.emit('mobile-video-call-$userID', {
+      'userID': Get.find<GlobalController>().userId.value,
+      'callStatus': "inCall",
+      'type': "offer",
+      'data': {
+        'sdp': offer.sdp,
+        'type': offer.type,
+      },
+    });
+
+    // todo: may need to store the peer connection
+  }
+
+  void ringUser(userID) {
+    isUserTypeSender.value = true;
+    Map<int, Map<String, dynamic>> allRoomMessageListMap = {for (var user in Get.find<MessengerController>().allRoomMessageList) user['userID']: user};
+    if (allRoomMessageListMap.containsKey(userID)) {
+      Get.find<MessengerController>().callerName.value = allRoomMessageListMap[userID]!['userName'];
+      Get.find<MessengerController>().callerImage.value = allRoomMessageListMap[userID]!['userImage'];
+    }
+    socket.emit('mobile-video-call-$userID', {
+      'userID': Get.find<GlobalController>().userId.value,
+      'callStatus': "ringing",
+      'type': "offer",
+    });
+    callState.value = "ringing";
+    Get.toNamed(krCallScreen);
   }
 }

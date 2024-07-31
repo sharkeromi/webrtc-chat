@@ -99,7 +99,9 @@ class MessageScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(right: h20),
                     child: TextButton(
                       style: kTextButtonStyle,
-                      onPressed: () {},
+                      onPressed: () {
+                        messengerController.ringUser(messengerController.selectedReceiver.value!.roomUserId);
+                      },
                       child: Icon(
                         Icons.video_call_rounded,
                         color: cPrimaryColor,
@@ -138,7 +140,7 @@ class MessageScreen extends StatelessWidget {
                   children: [
                     Column(
                       children: [
-                        CustomDivider(),
+                        const CustomDivider(),
                         Obx(() => Expanded(
                               child: SingleChildScrollView(
                                 reverse: true,
